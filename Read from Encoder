@@ -11,26 +11,35 @@ PwmOut M1B(PA_6);
 PwmOut M2F(PB_10);
 PwmOut M2B(PC_7); 
 
-// Encoder 
+// Encoder Pins
 //DigitalOut M1EnA(PA_15);
 //DigitalOut M1EnB(PB_3);
 //DigitalOut M2EnA(PA_1);
 //DigitalOut M2EnB(PC_4);
+
+
+//M1 -- Channel A : PA_15, Channel B: PB_3
+//M2 -- Channel A: PA_1, Channel B PC_4
 QEI M1Encoder (PA_15, PB_3, NC, 12);
 QEI M2Encoder (PA_1, PC_4, NC, 12);
-// main() runs in its own thread in the OS
-// (note the calls to Thread::wait below for delays)
 
 
 int main() {
     
  
     while (true) {
-       
-        pc.printf ("Encoder1:%d Encoder2: %d", M1Encoder.getPulses(), M2Encoder.getPulses());
-        //M2Encoder.getPulses();
-        M1F = 0.4;
+        M1B = 0.4;
         M2B = 0.4;
+       //Pulses
+       //Read and print off the number of revolutions recorded by the encoder on the index channel.
+        pc.printf ("\n\nEncoder Pluses:\n""Encoder1:%d Encoder2: %d", M1Encoder.getPulses(), M2Encoder.getPulses());
+    
+     
+        //return The current state of the encoder as a 2-bit number, where:
+        //bit 1 = The reading from channel B
+        //bit 2 = The reading from channel A
+       
+        pc.printf ("\n\nEncoder Current State:\n""Encoder1:%d Encoder2: %d", M1Encoder.getCurrentState(), M2Encoder.getCurrentState());
         
         //pc.printf("The Good Motor (M2):\n");
         //M2Encoder.getCurrentState();
