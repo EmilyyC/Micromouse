@@ -1,0 +1,47 @@
+#include "mbed.h"
+#include "QEI.h"
+
+DigitalOut led1(LED1);
+PwmOut M1B(PB_10);
+PwmOut M1F(PC_7);
+PwmOut M2B(PB_6);
+PwmOut M2F(PA_7);
+Serial pc(SERIAL_TX, SERIAL_RX);
+InterruptIn channelA1(PB_3);
+InterruptIn channelB1(PA_15);
+InterruptIn channelA2(PA_1);
+InterruptIn channelB2(PC_4);
+ volatile unsigned long counter=0;
+ void trigger1()
+ {
+     pc.printf("fuck\n");
+    // pc.printf("%u", counter);
+      /*while (counter>=270) 
+        {
+            M1B=0;
+            M1F=0; M2B=0; M2F=0;
+            };*/
+}
+void trigger2()
+{
+    pc.printf("rip\n");
+    }
+int main() 
+{
+   // channelA.rise(&trigger);
+    //pc.printf("Hello!\r\n");
+    while (true) 
+    {
+       
+     //   channelA1.rise(&trigger1);
+       // channelB1.rise(&trigger1);
+       // channelA2.rise(&trigger2);
+        channelB2.rise(&trigger2);
+       M1B = 0; 
+        M1F = 0.4;
+        M2B = 0.4;
+        M2F = 0;
+        led1 = !led1;
+        wait(40);
+    }
+}
