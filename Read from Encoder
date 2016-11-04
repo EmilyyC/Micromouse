@@ -1,40 +1,61 @@
 
 #include "mbed.h"
 #include "QEI.h"
-
-
+/////////////////////////////////////////////////////////////
+///SET UP ///////////////
+/////////////////////////////////////////////////////////////
 Serial pc(SERIAL_TX, SERIAL_RX);
 
+//MOTOR 
 PwmOut M1F(PA_7);
 PwmOut M1B(PA_6);
-
 //Motor two is backwards somehow 
 PwmOut M2F(PB_10);
 PwmOut M2B(PC_7); 
 
+// Encoder Pins
 //M1 -- Channel A : PA_15, Channel B: PB_3
 //M2 -- Channel A: PA_1, Channel B PC_4
-
 QEI M1Encoder (PA_15, PB_3, NC, 12);
 QEI M2Encoder (PA_1, PC_4, NC, 12);
 
+
+/////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////
+//ACTUAL CODE STARTS HERE
+/////////////////////////////////////////////////////////////
+
+double kp = 0.02;
+double ki = 0;
+double kd = 0;
+
 double P_value = 0.02;
-double I_value;
-double D_value;
+double I_value = 0;
+double pre_dif = 0;
+double pulse_dif = 0;
+double D_value = 0;
 Ticker Systicker;
-int M1_pulse= abs(M1Encoder.getPulses());
-int M2_pulse= abs(M2Encoder.getPulses());
+double M1_pulse= abs(M1Encoder.getPulses());
+double M2_pulse= abs(M2Encoder.getPulses());
+double total_correction = 0;
+
+///////////////////////////////////////////////////////////
 void systick()
 {
-    //Implementing P_value 
-    double P_correction = 0.02 * (abs(M1_pulse-M2_pulse));
-    if (M1_pulse > M2_pulse)
-        M1B = M1B - P_correction;
-    else 
-        M2B = M2B - P_correction;
-        
-        
     
+    //Implementing P_value 
+    pre_dif = pulse_dif;
+    pulse_dif = abs(M1_pulse-M2_pulse);
+    I_value =+ pulse_dif;
+    D_value = pulse_dif - pre_dif;
+    
+    total_correction = kp * pulse_dif + ki* I_value + kd*D_value;
+    
+    if (M1_pulse > M2_pulse)
+        M1B = M1B - total_correction;
+    else 
+        M2B = M2B - total_correction;
+
 }
 
 int main() {
