@@ -1,0 +1,56 @@
+#include "mbed.h"
+#include "QEI.h"
+DigitalOut led1(LED1);
+PwmOut M1B(PB_10);
+PwmOut M1F(PC_7);
+PwmOut M2B(PB_6);
+PwmOut M2F(PA_7);
+Serial pc(SERIAL_TX, SERIAL_RX);
+InterruptIn channelA1(PB_3); //Motor1
+InterruptIn channelB1(PA_15); //Motor1
+InterruptIn channelA2(PA_1); //Motor2
+InterruptIn channelB2(PC_4); //Motor2
+ volatile unsigned long counter1=0;
+ volatile unsigned long counter2=0;
+ float P_Controller(int error)
+ {
+    int correction=0.02*error;
+    return correction;
+}
+ void trigger1()
+ {
+     counter1++;
+     if (M1F>0.6 || M2B>0.6) 
+     {
+         M1F=0.4; M2B=0.4;
+    }
+     if (counter1>counter2) M2B=M2B+P_Controller(counter1-counter2);
+     else M1F=M1F+P_Controller(counter2-counter1);
+}
+void trigger2()
+{
+    counter2++;
+     
+     if (M1F>0.6 || M2B>0.6) 
+     {
+         M1F=0.4; M2B=0.4;
+    }
+     if (counter1>counter2) M2B=M2B+P_Controller(counter1-counter2);
+     else M1F=M1F+P_Controller(counter2-counter1);
+       
+}
+int main() 
+{ //pc.printf("hello world\n");
+     M1B = 0; 
+        M1F = 0.4;
+        M2B = 0.4;
+        M2F = 0;
+        counter1=0;
+        counter2=0;
+   channelA1.rise(&trigger1);
+        channelB1.rise(&trigger1);
+        channelA2.rise(&trigger2);
+        channelB2.rise(&trigger2);
+}
+   // channelA.rise(&trigger);
+    //pc.printf("Hello!\r\n");
