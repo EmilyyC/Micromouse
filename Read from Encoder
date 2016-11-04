@@ -4,32 +4,20 @@
 
 
 Serial pc(SERIAL_TX, SERIAL_RX);
-DigitalOut led1(LED1);
+
 PwmOut M1F(PA_7);
 PwmOut M1B(PA_6);
+
 //Motor two is backwards somehow 
 PwmOut M2F(PB_10);
 PwmOut M2B(PC_7); 
 
-// Encoder Pins
-//DigitalOut M1EnA(PA_15);
-//DigitalOut M1EnB(PB_3);
-//DigitalOut M2EnA(PA_1);
-//DigitalOut M2EnB(PC_4);
 //M1 -- Channel A : PA_15, Channel B: PB_3
 //M2 -- Channel A: PA_1, Channel B PC_4
 
 QEI M1Encoder (PA_15, PB_3, NC, 12);
 QEI M2Encoder (PA_1, PC_4, NC, 12);
 
- /*
- systick
-
-get encoder rev
-P eror = difference
-I error = Perror/time 
-
- */
 double P_value = 0.02;
 double I_value;
 double D_value;
