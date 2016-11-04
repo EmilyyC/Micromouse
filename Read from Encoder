@@ -16,35 +16,52 @@ PwmOut M2B(PC_7);
 //DigitalOut M1EnB(PB_3);
 //DigitalOut M2EnA(PA_1);
 //DigitalOut M2EnB(PC_4);
-
-
 //M1 -- Channel A : PA_15, Channel B: PB_3
 //M2 -- Channel A: PA_1, Channel B PC_4
+
 QEI M1Encoder (PA_15, PB_3, NC, 12);
 QEI M2Encoder (PA_1, PC_4, NC, 12);
 
+ /*
+ systick
+
+get encoder rev
+P eror = difference
+I error = Perror/time 
+
+ */
+double P_value = 0.02;
+double I_value;
+double D_value;
+Ticker Systicker;
+int M1_pulse= abs(M1Encoder.getPulses());
+int M2_pulse= abs(M2Encoder.getPulses());
+void systick()
+{
+    //Implementing P_value 
+    double P_correction = 0.02 * (abs(M1_pulse-M2_pulse));
+    if (M1_pulse > M2_pulse)
+        M1B = M1B - P_correction;
+    else 
+        M2B = M2B - P_correction;
+        
+        
+    
+}
 
 int main() {
+     M1B = 0.4;
+     M2B = 0.4;
     
- 
-    while (true) {
-        M1B = 0.4;
-        M2B = 0.4;
+     Systicker.attach(&systick,1000);
+     while (true) {
+        pc.printf("Hiiii!");
+        M1_pulse = abs(M1Encoder.getPulses());
+        M2_pulse = abs(M2Encoder.getPulses());
+        
        //Pulses
        //Read and print off the number of revolutions recorded by the encoder on the index channel.
         pc.printf ("\n\nEncoder Pluses:\n""Encoder1:%d Encoder2: %d", M1Encoder.getPulses(), M2Encoder.getPulses());
-    
-     
-        //return The current state of the encoder as a 2-bit number, where:
-        //bit 1 = The reading from channel B
-        //bit 2 = The reading from channel A
-       
-        pc.printf ("\n\nEncoder Current State:\n""Encoder1:%d Encoder2: %d", M1Encoder.getCurrentState(), M2Encoder.getCurrentState());
-        
-        //pc.printf("The Good Motor (M2):\n");
-        //M2Encoder.getCurrentState();
-    
-    
 
     }
 }
