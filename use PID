@@ -1,37 +1,36 @@
 #include "mbed.h"
 #include "QEI.h"
+
 //SERIAL_TX = PA_11
 //SERIAL_RX = PA_12
 Serial pc(PA_11, PA_12);
-//Serial pc(SERIAL_TX, SERIAL_RX);
-PwmOut M1B(PC_7);
-PwmOut M1F(PB_10);
-//Motor one is backwards somehow 
-PwmOut M2F(PA_7);
-PwmOut M2B(PB_6); 
+
+//Motors
+PwmOut M1F(PC_7);
+PwmOut M1B(PB_10);
+PwmOut M2F(PB_6);
+PwmOut M2B(PA_7);
+//Motor 2 is backwards somehow referring to schematic
+
 // Encoder Pins
-//DigitalOut M1EnA(PA_15);
-//DigitalOut M1EnB(PB_3);
-//DigitalOut M2EnA(PA_1);
-//DigitalOut M2EnB(PC_4);
 //M1 -- Channel A : PA_15, Channel B: PB_3
 //M2 -- Channel A: PA_1, Channel B PC_4
-QEI M1Encoder (PB_3, PA_15, NC, 4800, QEI::X4_ENCODING); // PA15 and PB3 is flipped 
+QEI M1Encoder (PB_3, PA_15, NC, 4800, QEI::X4_ENCODING);
+// PA15 and PB3 is flipped to make encoder values positive
 QEI M2Encoder (PA_1, PC_4, NC, 4800, QEI::X4_ENCODING);
 
 /////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
 //ACTUAL CODE STARTS HERE
-/////////////////////////////////////////////////////////////
 
-double kp = 0.02;
+double kp = 1.5;
 double ki = 0;
 double kd = 0;
 
-double P_value = 0.02;
+double pulse_dif = 0;
 double I_value = 0;
 double pre_dif = 0;
-double pulse_dif = 0;
+
 double D_value = 0;
 Ticker Systicker;
 double M1_pulse= abs(M1Encoder.getPulses());
@@ -49,9 +48,7 @@ void systick()
     
     total_correction = kp * pulse_dif + ki* I_value + kd*D_value;
     
-    
-    
-    if (M1B < 0.25 || M2B <0.25)
+    /*if (M1B < 0.25 || M2B < 0.25)
         {
            if (M1_pulse < M2_pulse )
                  M1B = M1B + total_correction;
@@ -59,13 +56,13 @@ void systick()
                 M2B = M2B + total_correction;
         }
     else
-        {
+        {*/
             if (M1_pulse > M2_pulse )
                 M1B = M1B - total_correction;
             else 
                  M2B = M2B - total_correction;
         
-        }
+       // }
     pc.printf ("Pulse difference:%d Total Corection : %d", pulse_dif, total_correction);
 
 }
@@ -79,18 +76,10 @@ int main()
     Systicker.attach(&systick,0.1);
      while (true) 
      {
-        
         pc.printf ("\n\nEncoder Pulses:\n""Encoder1:%d Encoder2: %d", M1Encoder.getPulses(), M2Encoder.getPulses());
         M1_pulse = abs(M1Encoder.getPulses());
         M2_pulse = abs(M2Encoder.getPulses());
         
     }
-    
-   
-   
-    //Read and print off the number of revolutions recorded by the encoder on the index channel.
-     
-
-       
     
 }
