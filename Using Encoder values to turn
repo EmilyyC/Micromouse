@@ -9,6 +9,7 @@ PwmOut M2B(PA_7);
 PwmOut M2F(PB_6);
 //Motor 2 is backwards somehow referring to schematic
 
+
 QEI M1Encoder (PB_3, PA_15, NC, 12);
 QEI M2Encoder (PA_1, PC_4, NC, 12);
 //M1 -- Channel A : PA_15, Channel B: PB_3 
@@ -29,6 +30,7 @@ int main()
         M1Encoder.reset();
         M2Encoder.reset();
         
+        //need to change this value to something else 
         int pulsePerInch = 125;
         
         //going straight 15.5 inches
