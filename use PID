@@ -1,85 +1,52 @@
 #include "mbed.h"
 #include "QEI.h"
-
-//SERIAL_TX = PA_11
-//SERIAL_RX = PA_12
-Serial pc(PA_11, PA_12);
-
-//Motors
+Ticker Systicker;
+Serial pc(PA_11, PA_12); //SERIAL_TX = PA_11  //SERIAL_RX = PA_12
 PwmOut M1F(PC_7);
 PwmOut M1B(PB_10);
 PwmOut M2F(PB_6);
 PwmOut M2B(PA_7);
 //Motor 2 is backwards somehow referring to schematic
-
-// Encoder Pins
 //M1 -- Channel A : PA_15, Channel B: PB_3
 //M2 -- Channel A: PA_1, Channel B PC_4
-QEI M1Encoder (PB_3, PA_15, NC, 4800, QEI::X4_ENCODING);
-// PA15 and PB3 is flipped to make encoder values positive
-QEI M2Encoder (PA_1, PC_4, NC, 4800, QEI::X4_ENCODING);
 
-/////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////
-//ACTUAL CODE STARTS HERE
-
-double kp = 1.5;
-double ki = 0;
-double kd = 0;
-
-double pulse_dif = 0;
-double I_value = 0;
-double pre_dif = 0;
-
-double D_value = 0;
-Ticker Systicker;
-double M1_pulse= abs(M1Encoder.getPulses());
-double M2_pulse= abs(M2Encoder.getPulses());
-double total_correction = 0;
-
+QEI M1Encoder (PB_3, PA_15, NC, 12); // PA15 and PB3 is flipped
+QEI M2Encoder (PA_1, PC_4, NC, 12);
+int encode1, encode2;
+double kp=0.00000073;// 0.000001 made us laugh
+double ki=0;//0.00003;
+double sum=0;//greater than zero if encode1 is larger
+bool flag=true;
 void systick()
 {
-    pc.printf ("hiii!\n");
-    //Implementing P_value 
-    pre_dif = pulse_dif;
-    pulse_dif = abs(M1_pulse-M2_pulse);
-    I_value =+ pulse_dif;
-    D_value = pulse_dif - pre_dif;
-    
-    total_correction = kp * pulse_dif + ki* I_value + kd*D_value;
-    
-    /*if (M1B < 0.25 || M2B < 0.25)
-        {
-           if (M1_pulse < M2_pulse )
-                 M1B = M1B + total_correction;
-            else 
-                M2B = M2B + total_correction;
-        }
-    else
-        {*/
-            if (M1_pulse > M2_pulse )
-                M1B = M1B - total_correction;
-            else 
-                 M2B = M2B - total_correction;
-        
-       // }
-    pc.printf ("Pulse difference:%d Total Corection : %d", pulse_dif, total_correction);
+    //pc.printf ("\n\nEncoder Pulses:\n""Encoder1:%d Encoder2: %d", encode1, encode2);
+    //if (encode1>10000) M1F=0 ;
+    //if (encode2>10000) M2F=0;
+    if (flag) 
+    {
+        sum=sum+(encode1-encode2);
+        if (encode1>encode2) M2F=M2F+kp*abs(encode1-encode2)+sum*ki;
+        else M1F=M1F+kp*abs(encode1-encode2)-sum*ki;
+    }
+    if (M1F>0.7 || M2F>0.7) 
+    {
+        M1F=0;
+        M2F=0;
+        flag=false;
+    }
 
 }
+
 int main()
 {
-    //Motor Voltages
-    M1F = 0.3;
-    M2F = 0.3;
-    M1B = 0;
-    M2B = 0;
-    Systicker.attach(&systick,0.1);
-     while (true) 
-     {
-        pc.printf ("\n\nEncoder Pulses:\n""Encoder1:%d Encoder2: %d", M1Encoder.getPulses(), M2Encoder.getPulses());
-        M1_pulse = abs(M1Encoder.getPulses());
-        M2_pulse = abs(M2Encoder.getPulses());
-        
+    M1F=0.15;
+    M2F=0.15;
+    Systicker.attach_us(&systick, 1000);
+    while(1) 
+    {
+        encode1=M1Encoder.getPulses();
+        encode2=M2Encoder.getPulses();
+        //pc.printf ("\n\nEncoder Pulses:\n""Encoder1:%d Encoder2: %d", M1Encoder.getPulses(), M2Encoder.getPulses());
+        if (flag) pc.printf("%d\n", encode1-encode2);
     }
-    
 }
