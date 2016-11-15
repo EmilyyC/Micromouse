@@ -1,56 +1,52 @@
 #include "mbed.h"
 #include "QEI.h"
-DigitalOut led1(LED1);
-PwmOut M1B(PB_10);
+Ticker Systicker;
+Serial pc(PA_11, PA_12); //SERIAL_TX = PA_11  //SERIAL_RX = PA_12
 PwmOut M1F(PC_7);
-PwmOut M2B(PB_6);
-PwmOut M2F(PA_7);
-Serial pc(SERIAL_TX, SERIAL_RX);
-InterruptIn channelA1(PB_3); //Motor1
-InterruptIn channelB1(PA_15); //Motor1
-InterruptIn channelA2(PA_1); //Motor2
-InterruptIn channelB2(PC_4); //Motor2
- volatile unsigned long counter1=0;
- volatile unsigned long counter2=0;
- float P_Controller(int error)
- {
-    int correction=0.02*error;
-    return correction;
-}
- void trigger1()
- {
-     counter1++;
-     if (M1F>0.6 || M2B>0.6) 
-     {
-         M1F=0.4; M2B=0.4;
-    }
-     if (counter1>counter2) M2B=M2B+P_Controller(counter1-counter2);
-     else M1F=M1F+P_Controller(counter2-counter1);
-}
-void trigger2()
+PwmOut M1B(PB_10);
+PwmOut M2F(PB_6);
+PwmOut M2B(PA_7);
+//Motor 2 is backwards somehow referring to schematic
+//M1 -- Channel A : PA_15, Channel B: PB_3
+//M2 -- Channel A: PA_1, Channel B PC_4
+
+QEI M1Encoder (PB_3, PA_15, NC, 12); // PA15 and PB3 is flipped
+QEI M2Encoder (PA_1, PC_4, NC, 12);
+int encode1, encode2;
+double kp=0.00000073;// 0.000001 made us laugh
+double ki=0;//0.00003;
+double sum=0;//greater than zero if encode1 is larger
+bool flag=true;
+void systick()
 {
-    counter2++;
-     
-     if (M1F>0.6 || M2B>0.6) 
-     {
-         M1F=0.4; M2B=0.4;
+    //pc.printf ("\n\nEncoder Pulses:\n""Encoder1:%d Encoder2: %d", encode1, encode2);
+    //if (encode1>10000) M1F=0 ;
+    //if (encode2>10000) M2F=0;
+    if (flag) 
+    {
+        sum=sum+(encode1-encode2);
+        if (encode1>encode2) M2F=M2F+kp*abs(encode1-encode2)+sum*ki;
+        else M1F=M1F+kp*abs(encode1-encode2)-sum*ki;
     }
-     if (counter1>counter2) M2B=M2B+P_Controller(counter1-counter2);
-     else M1F=M1F+P_Controller(counter2-counter1);
-       
+    if (M1F>0.7 || M2F>0.7) 
+    {
+        M1F=0;
+        M2F=0;
+        flag=false;
+    }
+
 }
-int main() 
-{ //pc.printf("hello world\n");
-     M1B = 0; 
-        M1F = 0.4;
-        M2B = 0.4;
-        M2F = 0;
-        counter1=0;
-        counter2=0;
-   channelA1.rise(&trigger1);
-        channelB1.rise(&trigger1);
-        channelA2.rise(&trigger2);
-        channelB2.rise(&trigger2);
+
+int main()
+{
+    M1F=0.15;
+    M2F=0.15;
+    Systicker.attach_us(&systick, 1000);
+    while(1) 
+    {
+        encode1=M1Encoder.getPulses();
+        encode2=M2Encoder.getPulses();
+        //pc.printf ("\n\nEncoder Pulses:\n""Encoder1:%d Encoder2: %d", M1Encoder.getPulses(), M2Encoder.getPulses());
+        if (flag) pc.printf("%d\n", encode1-encode2);
+    }
 }
-   // channelA.rise(&trigger);
-    //pc.printf("Hello!\r\n");
