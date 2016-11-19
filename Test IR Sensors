@@ -1,0 +1,48 @@
+#include "mbed.h"
+
+//leftmost(LM) receiver(R) PC_0
+//leftmost(LM) emitter(E) PB_7
+AnalogIn   LMR(PC_0);
+DigitalOut LME(PB_7);
+
+//upperleft(UL) receiver(R) PC_1
+//upperleft(UL) emitter(E) PB_0
+AnalogIn   ULR(PC_1);
+DigitalOut ULE(PB_0);
+
+//upperright(UR) receiver(R) PA_4
+//upperright(UR) emitter(E) PC_11
+AnalogIn   URR(PA_4);
+DigitalOut URE(PC_11);
+
+//rightmost(RM) receiver(R) PA_0
+//rightmost(RM) emitter(E)  PC_10
+AnalogIn   RMR(PA_0);
+DigitalOut RME(PC_10);
+
+Serial pc(PA_11, PA_12);
+
+int main() 
+{    
+    while(1) 
+    {
+        //LME = 1;
+        //pc.printf ("\nIR Sensor Values:%f\n", LMR.read());
+        //stop when greater than 0.78 across LMR
+        
+        //ULE = 1;
+        //pc.printf ("\nIR Sensor Values:%f\n", ULR.read());
+        //stop when greater than 0.9 across ULR
+        
+        //URE = 1;
+        //pc.printf ("\nIR Sensor Values:%f\n", URR.read());
+        //stop when greater than 0.9 across URR
+        
+        //RME = 1;
+        //pc.printf ("\nIR Sensor Values:%f\n", RMR.read());
+        //stop when greater than 0.5 across RMR
+        
+        
+        wait(0.5);
+    }
+}
