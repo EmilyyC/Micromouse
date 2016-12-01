@@ -1,2 +1,0 @@
-# Micromouse
-IEEE_MM 
