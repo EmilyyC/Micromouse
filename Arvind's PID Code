@@ -13,12 +13,12 @@ PwmOut M2B(PA_7);
 QEI M1Encoder (PB_3, PA_15, NC, 12); // PA15 and PB3 is flipped
 QEI M2Encoder (PA_1, PC_4, NC, 12);
 int encode1, encode2;
-double kp=0.000009;
+double kp=0.0000041;//0.0000042;//0.000002;//0.00000424;//0.000004;//0.000007;//0.00003;
 //double kp=0.00000073;// 0.000001 made us laugh
-double ki=0;//.0000000000000000000000000073;
+double ki=0;//0.00000014;//0.0000027;//0.00003;//0.000035;//0.00001;//.0000000000000000000000000073;
 double sum=0;//greater than zero if encode1 is larger
 bool flag=true;
-
+int fuck=0;
 void systick()
 {
     //pc.printf ("\n\nEncoder Pulses:\n""Encoder1:%d Encoder2: %d", encode1, encode2);
@@ -26,21 +26,26 @@ void systick()
     //if (encode2>10000) M2F=0;
     if (flag) 
     {
-        if(abs(encode1-encode2) > 40)
+        
+        if (fuck==10) fuck=0;
+     /*   if(abs(encode1-encode2) > 40)
         {
             sum = 0;  
             M1F = 0.15;
             M2F = 0.15;
-        } 
+           // M1Encoder.reset();
+           // M2Encoder.reset();
+        } */
         sum=sum+(encode1-encode2);
-        if (encode1>encode2) M2F=M2F+kp*abs(encode1-encode2)+sum*ki;
-        else M1F=M1F+kp*abs(encode1-encode2)-sum*ki;
+        if (encode1>encode2) M2F=M2F+kp*abs(encode1-encode2)+(!fuck)*sum*ki;
+        else M1F=M1F+kp*abs(encode1-encode2)-(!fuck)*sum*ki;
+        ++fuck;
     }
     if (M1F>0.4 || M2F>0.4) 
     {
-        M1F=0.2;
-        M2F=0.2;
-        flag=false;
+        M1F=0.15;
+        M2F=0.15;
+        
     }
 }
 
