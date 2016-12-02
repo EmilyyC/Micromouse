@@ -1,22 +1,19 @@
 #include "mbed.h"
 #include "QEI.h"
 Ticker Systicker;
-//leftmost(LM) receiver(R) PC_0
-//leftmost(LM) emitter(E) PB_7
+//Serial pc(PA_11, PA_12);
+
+// 8 sensors
 AnalogIn   LMR(PC_0);
 DigitalOut LME(PB_7);
-//upperleft(UL) receiver(R) PC_1
-//upperleft(UL) emitter(E) PB_0
 AnalogIn   ULR(PC_1);
 DigitalOut ULE(PB_0);
-//upperright(UR) receiver(R) PA_4
-//upperright(UR) emitter(E) PC_11
 AnalogIn   URR(PA_4);
 DigitalOut URE(PC_11);
-//rightmost(RM) receiver(R) PA_0
-//rightmost(RM) emitter(E)  PC_10
 AnalogIn   RMR(PA_0);
 DigitalOut RME(PC_10);
+
+
 PwmOut M1F(PC_7);
 PwmOut M1B(PB_10);
 PwmOut M2F(PB_6);
@@ -24,16 +21,24 @@ PwmOut M2B(PA_7);
 QEI M1Encoder (PB_3, PA_15, NC, 12);
 QEI M2Encoder (PA_1, PC_4, NC, 12);
 int pulsePerInch = 140;
-bool P_enable=true;
+bool P_enable=false;
+
 Serial pc(PA_11, PA_12);
-float leftIR,rightIR;
-float kp=0.0005;
+float leftIR,rightIR, upperRIR; //upperLIR;
+float kp=0.1;
+long encode1, encode2;
 void systick()
 {
     if (!P_enable) return;
     //p
+
     if (rightIR>leftIR) M1F=M1F+kp*(rightIR-leftIR);
     else if (leftIR>rightIR) M2F=M2F+kp*(leftIR-rightIR);
+    /*
+     if (encode1>encode2) M2F=M2F+kp*abs(encode1-encode2);
+     else M1F=M1F+kp*abs(encode1-encode2);
+    */
+
     if (M1F>0.4 || M2F>0.4) {
         M1F=0.15;
         M2F=0.15;
@@ -41,78 +46,131 @@ void systick()
 }
 int main()
 {
+
     M1F = 0.15;
     M1B = 0;
     M2F = 0.15;
     M2B = 0;
     M1Encoder.reset();
     M2Encoder.reset();
-    LME = 1;
-    ULE = 0;
-    URE = 0;
-    RME = 1;
-    Systicker.attach_us(&systick, 1000);
+    /* LME = 1;
+     ULE = 0;
+     URE = 0;
+     RME = 1;*/
+    Systicker.attach_us(&systick, 50000);
     while(1) {
+        P_enable=true;
+
+        encode1=M1Encoder.getPulses();
+        encode2=M2Encoder.getPulses();
+        pc.printf("\n\n%f\n%f\n%f", leftIR,rightIR, upperRIR);
+        //wait (0.2);
+        RME=1;
         rightIR=RMR.read();
+        wait(0.05);
+        RME=0;
+
+
+        LME=1;
         leftIR=LMR.read();
+        wait(0.05);
+        LME=0;
+
+
+        URE=1;
+        upperRIR=URR.read();
+        wait(0.05);
+        URE=0;
+
+
+        /*ULE=1;
+        upperLIR=ULR.read();
+        ULE=0;*/
+
         // pc.printf("%f\n",rightIR-leftIR);
         //pc.printf ("\nLMR Sensor Values:%f\n", LMR.read());
         //code to turn left
-        if(leftIR < 0.38) {
-            P_enable=false;
-            M1Encoder.reset();
-            M2Encoder.reset();
-            //going straight 6 inches until turn
-            while (M1Encoder.getPulses() < pulsePerInch*6 && M2Encoder.getPulses() < pulsePerInch*6) {
+        if (upperRIR >0.5) {
+            if(leftIR<rightIR) {
+                P_enable=false;
+                M1Encoder.reset();
+                M2Encoder.reset();
+                /*going straight 6 inches until turn
+                while (M1Encoder.getPulses() < pulsePerInch*6 && M2Encoder.getPulses() < pulsePerInch*6) {
+                    M1F = 0.15;
+                    M1B = 0;
+                    M2F = 0.15;
+                    M2B = 0;
+                }
+
+                M1Encoder.reset();
+                M2Encoder.reset();*/
+
+
+                //turning left
+                while (M1Encoder.getPulses() < pulsePerInch*2.45 && M2Encoder.getPulses() < pulsePerInch*2.45) {
+                    M1F = 0.3;
+                    M1B = 0;
+                    M2F = 0;
+                    M2B = 0.3;
+                }
                 M1F = 0.15;
                 M1B = 0;
                 M2F = 0.15;
                 M2B = 0;
-            }
-            M1Encoder.reset();
-            M2Encoder.reset();
-            //turning left
-            while (M1Encoder.getPulses() < pulsePerInch*2.45 && M2Encoder.getPulses() < pulsePerInch*2.45) {
-                M1F = 0.3;
-                M1B = 0;
-                M2F = 0;
-                M2B = 0.3;
-            }
-            M1F = 0.15;
-            M1B = 0;
-            M2F = 0.15;
-            M2B = 0;
-            M1Encoder.reset();
-            M2Encoder.reset();
-            P_enable=true;
-        }
-        else if(rightIR < 0.38) {
-            P_enable=false;
-            M1Encoder.reset();
-            M2Encoder.reset();
-            //going straight 6 inches until turn
-            while (M1Encoder.getPulses() < pulsePerInch*6 && M2Encoder.getPulses() < pulsePerInch*6) {
+                M1Encoder.reset();
+                M2Encoder.reset();
+                while (M1Encoder.getPulses() < pulsePerInch*6 && M2Encoder.getPulses() < pulsePerInch*6) {
+                    M1F = 0.15;
+                    M1B = 0;
+                    M2F = 0.15;
+                    M2B = 0;
+                }
+
+                M1Encoder.reset();
+                M2Encoder.reset();
+                P_enable=true;
+            } else {
+                P_enable=false;
+                M1Encoder.reset();
+                M2Encoder.reset();
+                //going straight 6 inches until turn
+                /* while (M1Encoder.getPulses() < pulsePerInch*6 && M2Encoder.getPulses() < pulsePerInch*6) {
+                     M1F = 0.15;
+                     M1B = 0;
+                     M2F = 0.15;
+                     M2B = 0;
+                 }
+                 M1Encoder.reset();
+                 M2Encoder.reset();*/
+                //turning right
+                while (M1Encoder.getPulses() < pulsePerInch*2.45 && M2Encoder.getPulses() < pulsePerInch*2.45) {
+                    M1F = 0;
+                    M1B = 0.3;
+                    M2F = 0.3;
+                    M2B = 0;
+                }
                 M1F = 0.15;
                 M1B = 0;
                 M2F = 0.15;
                 M2B = 0;
+
+                M1Encoder.reset();
+                M2Encoder.reset();
+                while (M1Encoder.getPulses() < pulsePerInch*6 && M2Encoder.getPulses() < pulsePerInch*6) {
+                    M1F = 0.15;
+                    M1B = 0;
+                    M2F = 0.15;
+                    M2B = 0;
+                }
+
+
+                M1Encoder.reset();
+                M2Encoder.reset();
+                P_enable=false;
             }
-            M1Encoder.reset();
-            M2Encoder.reset();
-            //turning right
-            while (M1Encoder.getPulses() < pulsePerInch*2.45 && M2Encoder.getPulses() < pulsePerInch*2.45) {
-                M1F = 0;
-                M1B = 0.3;
-                M2F = 0.3;
-                M2B = 0;
-            }
-            M1F = 0.15;
-            M1B = 0;
-            M2F = 0.15;
-            M2B = 0;
-            M1Encoder.reset();
-            M2Encoder.reset();
-            P_enable=false;
         }
     }
+
+
 }
