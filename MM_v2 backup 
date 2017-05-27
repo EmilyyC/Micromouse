@@ -1,0 +1,396 @@
+//somewhat working back up code
+#include "mbed.h"
+#include "QEI.h"
+#include "basics.h"
+Ticker Systicker;
+Serial pc(PA_11, PA_12); // setting up RX TX
+
+DigitalOut led_red(PB_12);
+DigitalOut led_blue(PB_13);
+
+AnalogIn   LMR(PC_5);
+DigitalOut LME(PC_7);
+AnalogIn   ULR(PC_4);
+DigitalOut ULE(PB_0);
+AnalogIn   URR(PC_1);
+DigitalOut URE(PB_1);
+AnalogIn   RMR(PC_0);
+DigitalOut RME(PC_6);
+
+PwmOut Motor_LF(PA_6);
+PwmOut Motor_LB(PA_7);
+PwmOut Motor_RF(PB_6);
+PwmOut Motor_RB(PB_7);
+
+QEI MLEncoder (PA_0, PA_1, NC, 12); //left encoder
+QEI MREncoder (PA_3, PA_2, NC, 12); //right encoder
+//general
+double speed = 0.10;
+double speed_right = speed * 0.860;
+double pulsePerInch = 700;
+bool PID_enable=false;
+
+//encoders
+double encode1, encode2;
+double ML_pulse, MR_pulse, MR_prev_pulse, ML_prev_pulse, MR_cur_pulse, ML_cur_pulse;
+double encoderDif, integral=0;
+double P_value = 0.000000001838;
+double I_value = 0.0000;
+
+//IRs
+double leftIR, rightIR, upperRIR, upperLIR;
+double kp_IR=0.00005;
+double IR_dif, IR_intgral;
+
+//Flags
+bool stuck_flag = 0;
+bool IS_RUNNING = 1;
+//
+int sys_count = 0;
+
+////////////////////////////////////////////////////////////////////////////
+///////////////////// STOP AND GO ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+void proceed()
+{
+    PID_enable = true;
+    Motor_LF = speed;
+    Motor_LB = 0;
+    Motor_RF = speed_right;
+    Motor_RB = 0;
+}
+void all_motor_off()
+{
+    Motor_LF = 0;
+    Motor_LB = 0;
+    Motor_RF = 0;
+    Motor_RB = 0;
+}
+void stop()
+{
+    PID_enable = false;
+    led_red = 1;
+
+    Motor_LF =0;
+    Motor_LB =speed;
+    Motor_RF =0;
+    Motor_RB =speed_right;
+    wait (0.03);
+    all_motor_off();
+    wait (0.02);
+
+}
+void travelNCell(double N )
+{
+    MLEncoder.reset();
+    MREncoder.reset();
+
+    while (MLEncoder.getPulses() < N*2700 && MREncoder.getPulses() < N*2700 ) {
+        Motor_LF = speed;
+        Motor_LB = 0;
+        Motor_RF = speed_right;
+        Motor_RB =0;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////
+/////////////////////TURNING ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+void turnLeft()
+{
+    PID_enable = false;
+    MLEncoder.reset();
+    MREncoder.reset();
+
+    while (MREncoder.getPulses() < 520 ) {
+        Motor_LF = 0;
+        Motor_LB = speed;
+        Motor_RF = speed_right;
+        Motor_RB = 0;
+    }
+
+    all_motor_off();
+    wait (0.5);
+    PID_enable = true;
+    MLEncoder.reset();
+    MREncoder.reset();
+    proceed();
+
+}
+void turnRight(double N = 1) // in case if want to turn 180, pass in N = 2.5
+{
+    PID_enable = false;
+    MLEncoder.reset();
+    MREncoder.reset();
+
+    while ( MLEncoder.getPulses() < 650 * N ) {
+        Motor_LF = speed;
+        Motor_LB = 0;
+        Motor_RF = 0;
+        Motor_RB = speed;
+
+    }
+    all_motor_off();
+    wait (0.5);
+    PID_enable = true;
+    MLEncoder.reset();
+    MREncoder.reset();
+    proceed();
+}
+
+////////////////////////////////////////////////////////////////////////////
+///////////////////// SENSORS ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+void getEncoderValue()
+{
+
+
+    ML_pulse = MLEncoder.getPulses();
+    MR_pulse = MREncoder.getPulses()/1.125; // Right encoder is 1.125 time faster
+
+
+    encoderDif = abs (ML_pulse - MR_pulse);
+
+    // pc.printf ("\ncurrent pulses: %f\t%f\n", ML_pulse,MR_pulse);
+
+
+
+    //pc.printf("\n%f",(ML_pulse - MR_pulse));
+    //integral = integral + encoderDif;
+
+}
+
+void getSensorValue()
+{
+    RME=1;
+    rightIR=RMR.read();
+    LME=1;
+    leftIR=LMR.read();
+    URE=1;
+    upperRIR=URR.read();
+    ULE=1;
+    upperLIR=ULR.read();
+    IR_dif = leftIR - rightIR -0.15;
+
+
+    pc.printf("\n\n%f\n%f\n%f\n%f\n%f", leftIR,upperLIR, upperRIR,rightIR,IR_dif );
+    wait (0.5);
+}
+
+////////////////////////////////////////////////////////////////////////////
+///////////////////// SPEED AND WALL ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+void checkSpeed()
+{
+    if (Motor_LF >( speed+0.1) || Motor_RF > (speed_right + 0.10)) {
+        Motor_LF = speed;
+        Motor_RF = speed_right;
+    } else if (Motor_LF >( speed-0.1) || Motor_RF > (speed_right -0.10)) {
+        Motor_LF = speed;
+        Motor_RF = speed_right;
+    }
+}
+
+bool checkDeadEnd()
+{
+    if (upperRIR >0.40 &&  upperLIR > 0.40 && rightIR > 0.17 && leftIR >0.17 ) {
+        PID_enable = false;
+
+        Motor_LF =0;
+        Motor_LB =speed;
+        Motor_RF =0;
+        Motor_RB =speed_right;
+        wait (0.1);
+        all_motor_off();
+        wait (0.02);
+        turnRight(2.5);  // truns out it takes more to do 180
+        PID_enable = true;
+        return true;
+    }
+    return false;
+
+}
+
+bool ifFrontWall()
+{
+    if (upperRIR >0.40 &&  upperLIR > 0.40) {
+        PID_enable = false;
+        Motor_LF =0;
+        Motor_LB =speed;
+        Motor_RF =0;
+        Motor_RB =speed;
+        wait (0.03);
+        all_motor_off();
+        wait (0.02);
+        PID_enable = true;
+        return true;
+    }
+    return false;
+}
+
+
+
+void avoidFrontWall()
+{
+    if (ifFrontWall()) {
+
+        if (leftIR < 0.45)
+            turnLeft();
+        else if (rightIR < 0.25)
+            turnRight();
+        else
+            turnRight(2.5); // if it goes to a deadend then turn 180
+    } 
+  //  else
+//        proceed();
+}
+
+
+void wallFollower()
+{
+    if (rightIR < 0.05 && MR_pulse > 1000 && ML_pulse > 1000 ) {
+        //stop();
+        travelNCell(0.5);
+        all_motor_off();
+        wait (0.5);
+        turnRight();
+    }
+
+
+}
+
+void isStuck()
+{
+    //
+
+
+    //if ( ! stuck_flag ) return;
+//    MR_prev_pulse = MR_cur_pulse;
+//    ML_prev_pulse = ML_cur_pulse;
+//
+//    ML_cur_pulse = MLEncoder.getPulses();
+//    MR_cur_pulse = MREncoder.getPulses()/1.125; // Right encoder is 1.125 time faster
+//
+//    // pc.printf(" previous: %f, %f\n",ML_prev_pulse, MR_prev_pulse);
+////    pc.printf(" current: %f, %f\n", ML_cur_pulse, MR_cur_pulse);
+////
+////    pc.printf("%f, %f\n", ML_cur_pulse- ML_prev_pulse, MR_cur_pulse- MR_prev_pulse);
+//
+//    //pc.printf("stuck flag is 1 and now checking encoder\n");
+//    if ( ((abs(ML_pulse- ML_prev_pulse) < 100) && (  Motor_LF > 0 ) )
+//            ||((abs(MR_pulse- MR_prev_pulse ) < 100) && (  Motor_RF > 0 )) ) {
+//        //stuck_flag = 1;
+//        //pc.printf("im stuck\n");
+        PID_enable = 0;
+        Motor_LF = 0;
+        Motor_LB = speed;
+        Motor_RF = 0;
+        Motor_RB = speed_right;
+        wait(0.5);
+        //all_motor_off();
+//        wait(1);
+        proceed();
+        wait(0.5);
+        stuck_flag =0;
+        PID_enable = 1;
+        MLEncoder.reset();
+        MREncoder.reset();
+    
+//    MLEncoder.reset();
+//    MREncoder.reset();
+
+
+
+
+//while (abs(MREncoder.getPulses()) < 520 && abs(MLEncoder.getPulses()) < 520 ) {
+//        Motor_LF = 0;
+//        Motor_LB = speed;
+//        Motor_RF = 0;
+//        Motor_RB = speed_right;
+//    }
+
+
+}
+
+
+//SYSTICK 
+
+void systick() // PID
+{
+       // MR_prev_pulse = MR_cur_pulse;
+//        ML_prev_pulse = ML_cur_pulse;
+//    
+//        ML_cur_pulse = MLEncoder.getPulses();
+//        MR_cur_pulse = MREncoder.getPulses()/1.125; // Right encoder is 1.125 time faster
+//  
+//    if (IS_RUNNING &&((ML_cur_pulse - ML_prev_pulse) < 10) &&((MR_cur_pulse - MR_prev_pulse) < 10)) {
+//        sys_count ++;
+//        }
+//    else {
+//        sys_count = 0; 
+//    }
+//    if (sys_count >= 100){
+//        sys_count = 0;
+//        isStuck();
+//        sys_count = 0;
+//        }
+    
+    
+    if (!PID_enable) return;
+    if (IR_dif > -0.15 && IR_dif < 0.15) {
+        Motor_LF = speed;
+        Motor_RF = speed_right;
+    } else {
+        Motor_LF = Motor_LF + kp_IR* IR_dif;
+        Motor_RF = Motor_RF - kp_IR* IR_dif ;
+    }
+
+
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+///////////////////// MAIN ////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+int main()
+{
+    Motor_LF = speed;
+    Motor_LB = 0;
+    Motor_RF = speed_right;
+    Motor_RB = 0;
+    MLEncoder.reset();
+    MREncoder.reset();
+    Systicker.attach(&systick, 0.001);
+    led_red = 0;
+    stuck_flag = 0;
+ 
+    while (1) {
+        //pc.printf ("\n\nEncoder Pulses:\n""Encoder left:%d Encoder right: %d", MLEncoder.getPulses(), MREncoder.getPulses());
+        PID_enable = 1;
+        getEncoderValue();
+        getSensorValue();
+         PID_enable = 0;
+         all_motor_off();
+        wait(1);
+        PID_enable = 1;
+        travelNCell(1);
+        PID_enable = 0;
+        all_motor_off();
+        wait(1);
+        if (leftIR < 0.35)
+            turnLeft();
+        else if (rightIR < 0.2)
+            turnRight();
+        else
+            turnRight(2.5);
+        PID_enable = 1;
+       // wallFollower();
+        //avoidFrontWall();
+       
+
+
+
+    }
+}
